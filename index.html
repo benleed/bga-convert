@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BGA Backgammon Log &rarr; GNU Backgammon (.mat) Converter</title>
+<style>
+  :root {
+    --bg: #1e1e1e;
+    --panel: #252526;
+    --border: #3c3c3c;
+    --text: #d4d4d4;
+    --accent: #007acc;
+    --accent-hover: #1391e0;
+    --warn: #d9a441;
+    --err: #e06c6c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 1.5rem;
+  }
+  h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+  p.sub { color: #9a9a9a; margin-top: 0; margin-bottom: 1.25rem; }
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+  }
+  .panel h2 { font-size: 1rem; margin: 0 0 0.5rem 0; }
+  textarea {
+    width: 100%;
+    min-height: 380px;
+    background: #111;
+    color: #d4d4d4;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 0.85rem;
+    padding: 0.5rem;
+    resize: vertical;
+    white-space: pre;
+  }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+    margin: 0.75rem 0;
+  }
+  label { font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem; }
+  input[type="number"] {
+    width: 4.5rem;
+    background: #111;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.25rem 0.4rem;
+  }
+  button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 0.5rem 0.9rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  button:hover { background: var(--accent-hover); }
+  button.secondary {
+    background: #3a3d41;
+  }
+  button.secondary:hover { background: #4b4f54; }
+  .messages {
+    margin-top: 0.75rem;
+    font-size: 0.8rem;
+    max-height: 160px;
+    overflow-y: auto;
+  }
+  .messages .warn { color: var(--warn); }
+  .messages .err { color: var(--err); }
+  .messages .info { color: #8fb8de; }
+  .messages div { margin-bottom: 2px; }
+  footer { margin-top: 1.5rem; font-size: 0.75rem; color: #777; }
+  code { background: #111; padding: 1px 5px; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<h1>BGA Backgammon Log &rarr; GNU Backgammon (.mat) Converter</h1>
+<p class="sub">Paste a Board Game Arena backgammon move log below. Dice rolls (not shown by BGA) are inferred from the checker movements. The result is a <code>.mat</code> file that GNU Backgammon can import and analyse.</p>
+
+<div class="controls">
+  <label>Match length (points):
+    <input type="number" id="matchLength" value="1" min="0" max="99">
+  </label>
+  <button id="convertBtn">Convert</button>
+  <button id="exampleBtn" class="secondary">Load example</button>
+  <button id="clearBtn" class="secondary">Clear</button>
+</div>
+
+<div class="layout">
+  <div class="panel">
+    <h2>BGA log</h2>
+    <textarea id="inputLog" placeholder="Paste the BGA move log here..."></textarea>
+  </div>
+  <div class="panel">
+    <h2>GNU Backgammon match (.mat)</h2>
+    <textarea id="outputMat" readonly placeholder="Converted output will appear here..."></textarea>
+    <div class="controls">
+      <button id="copyBtn" class="secondary">Copy to clipboard</button>
+      <button id="downloadBtn" class="secondary">Download .mat</button>
+    </div>
+    <div class="messages" id="messages"></div>
+  </div>
+</div>
+
+<footer>
+  Notes: cube actions (double/take/drop) and resignations are not present in this BGA log format and are not handled.
+  When BGA shows only one checker move for a roll (the other die could not be played, or the game ended after bearing
+  off the last checker), the unused die's value cannot be recovered from the log and is guessed &mdash; this is flagged
+  in the messages panel. Bear-off "overage" (e.g. bearing off a 3-point with a 5 because no higher points are occupied)
+  is detected by simulating the board, so doubles that mix exact and overage bear-offs (like <code>4/off 4/off 3/off 3/off</code>
+  for a rolled double-4) are reconstructed correctly.
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  const ARROW = /[➡→]/;
+
+  const EXAMPLE_LOG = `Move 1 :24/07/2026 11:37:12
+charliefooo jellyfis rolls dice and gets dice and dice
+Move 2 :11:37:20
+charliefooo jellyfis moves 8 ➡ 7 , 13 ➡ 7 .
+lemonseeds rolls dice and gets dice and dice
+Move 3 :11:37:35
+lemonseeds moves 13 ➡ 8 , 13 ➡ 11 .
+charliefooo jellyfis rolls dice and gets dice and dice
+Move 4 :11:37:45
+charliefooo jellyfis moves 13 ➡ 9 , 9 ➡ 8 .
+lemonseeds rolls dice and gets dice and dice
+Move 5 :11:38:17
+lemonseeds moves 13 ➡ 7 , 7 ➡ 5 .
+charliefooo jellyfis rolls dice and gets dice and dice
+Move 6 :11:38:27
+charliefooo jellyfis moves 24 ➡ 20 hitting   , 20 ➡ 14 hitting   .
+lemonseeds rolls dice and gets dice and dice
+Move 7 :11:38:38
+lemonseeds moves bar ➡ 23 , bar ➡ 21 .
+charliefooo jellyfis rolls dice and gets dice and dice
+Move 8 :11:39:03
+charliefooo jellyfis moves 14 ➡ 9 , 9 ➡ 7 .
+lemonseeds rolls dice and gets dice and dice
+Move 9 :11:39:25
+lemonseeds moves 21 ➡ 15 , 15 ➡ 10 .
+charliefooo jellyfis rolls dice and gets dice and dice
+Move 10 :11:39:39
+charliefooo jellyfis moves 8 ➡ 3 , 6 ➡ 3 .
+lemonseeds rolls dice and gets dice and dice
+Move 11 :11:40:36
+lemonseeds moves 6 ➡ 2 , 2 ➡ 1 hitting   .
+charliefooo jellyfis rolls dice and gets dice and dice
+It is a double!
+Move 12 :11:40:57
+charliefooo jellyfis moves bar ➡ 23 , 23 ➡ 21 , 6 ➡ 4 , 6 ➡ 4 .
+lemonseeds rolls dice and gets dice and dice
+Move 13 :11:41:08
+lemonseeds moves 10 ➡ 4 hitting   , 8 ➡ 4 .
+charliefooo jellyfis rolls dice and gets dice and dice
+Move 14 :11:41:18
+charliefooo jellyfis moves bar ➡ 22 , 22 ➡ 18 .
+lemonseeds rolls dice and gets dice and dice
+Move 15 :11:41:41
+lemonseeds moves 8 ➡ 3 , 6 ➡ 3 .
+charliefooo jellyfis rolls dice and gets dice and dice
+Move 16 :11:41:52
+charliefooo jellyfis moves 18 ➡ 13 , 7 ➡ 6 .
+lemonseeds rolls dice and gets dice and dice
+Move 17 :11:42:07
+lemonseeds moves 23 ➡ 20 , 20 ➡ 15 .
+charliefooo jellyfis rolls dice and gets dice and dice
+Move 18 :11:42:21
+charliefooo jellyfis moves 13 ➡ 10 hitting   , 10 ➡ 6 .
+lemonseeds rolls dice and gets dice and dice
+Move 19 :11:42:31
+lemonseeds moves bar ➡ 20 , 20 ➡ 16 .
+charliefooo jellyfis rolls dice and gets dice and dice
+Move 20 :11:42:44
+charliefooo jellyfis moves 13 ➡ 10 , 10 ➡ 8 .
+lemonseeds rolls dice and gets dice and dice
+Move 21 :11:43:00
+lemonseeds moves 16 ➡ 10 , 10 ➡ 9 .
+charliefooo jellyfis rolls dice and gets dice and dice
+Move 22 :11:43:15
+charliefooo jellyfis moves 13 ➡ 10 , 13 ➡ 7 .
+lemonseeds rolls dice and gets dice and dice
+Move 23 :11:43:30
+lemonseeds moves 13 ➡ 9 , 13 ➡ 11 .
+charliefooo jellyfis rolls dice and gets dice and dice
+Move 24 :11:43:41
+charliefooo jellyfis moves 10 ➡ 5 , 7 ➡ 5 .
+lemonseeds rolls dice and gets dice and dice
+Move 25 :11:43:50
+lemonseeds moves 11 ➡ 5 , 6 ➡ 5 .
+charliefooo jellyfis rolls dice and gets dice and dice
+Move 26 :11:44:16
+charliefooo jellyfis moves 8 ➡ 7 , 6 ➡ 4 .
+lemonseeds rolls dice and gets dice and dice
+Move 27 :11:44:43
+lemonseeds moves 9 ➡ 3 , 9 ➡ 4 .
+charliefooo jellyfis rolls dice and gets dice and dice
+It is a double!
+Move 28 :11:45:00
+charliefooo jellyfis moves 8 ➡ 5 , 5 ➡ 2 , 8 ➡ 5 , 5 ➡ 2 .
+lemonseeds rolls dice and gets dice and dice
+It is a double!
+Move 29 :11:45:22
+lemonseeds moves 3 ➡ 2 , 4 ➡ 3 , 3 ➡ 2 , 8 ➡ 7 .
+charliefooo jellyfis rolls dice and gets dice and dice
+Move 30 :11:45:55
+charliefooo jellyfis moves 4 ➡ 2 .
+lemonseeds rolls dice and gets dice and dice
+It is a double!
+Move 31 :11:46:05
+lemonseeds moves 7 ➡ 5 , 5 ➡ 3 , 3 ➡ 1 , 8 ➡ 6 .
+charliefooo jellyfis rolls dice and gets dice and dice
+Move 32 :11:46:17
+charliefooo jellyfis moves 7 ➡ 3 , 6 ➡ 4 .
+lemonseeds rolls dice and gets dice and dice
+Move 33 :11:46:33
+lemonseeds moves 6 ➡ 4 , 4 ➡ 3 .
+charliefooo jellyfis rolls dice and gets dice and dice
+Move 34 :11:46:43
+charliefooo jellyfis moves 7 ➡ 5 , 7 ➡ 4 .
+lemonseeds rolls dice and gets dice and dice
+Move 35 :11:47:00
+lemonseeds moves 6 ➡ 1 , 6 ➡ 3 .
+charliefooo jellyfis rolls dice and gets dice and dice
+Move 36 :11:47:08
+charliefooo jellyfis moves 6 ➡ home , 6 ➡ 4 .
+lemonseeds rolls dice and gets dice and dice
+Move 37 :11:47:16
+lemonseeds moves 24 ➡ 19 , 19 ➡ 18 .
+charliefooo jellyfis rolls dice and gets dice and dice
+Move 38 :11:47:27
+charliefooo jellyfis moves 5 ➡ home , 4 ➡ home .
+lemonseeds rolls dice and gets dice and dice
+Move 39 :11:47:34
+lemonseeds moves 18 ➡ 13 , 13 ➡ 9 .
+charliefooo jellyfis rolls dice and gets dice and dice
+Move 40 :11:47:44
+charliefooo jellyfis moves 5 ➡ home , 5 ➡ 4 .
+lemonseeds rolls dice and gets dice and dice
+Move 41 :11:48:09
+lemonseeds moves 9 ➡ 5 , 24 ➡ 18 .
+charliefooo jellyfis rolls dice and gets dice and dice
+Move 42 :11:48:17
+charliefooo jellyfis moves 4 ➡ home , 4 ➡ home .
+lemonseeds rolls dice and gets dice and dice
+Move 43 :11:48:24
+lemonseeds moves 18 ➡ 13 , 13 ➡ 10 .
+charliefooo jellyfis rolls dice and gets dice and dice
+Move 44 :11:48:34
+charliefooo jellyfis moves 2 ➡ home , 4 ➡ home .
+lemonseeds rolls dice and gets dice and dice
+Move 45 :11:48:45
+lemonseeds moves 10 ➡ 4 , 5 ➡ home .
+charliefooo jellyfis rolls dice and gets dice and dice
+It is a double!
+Move 46 :11:48:57
+charliefooo jellyfis moves 4 ➡ home , 4 ➡ home , 3 ➡ home , 3 ➡ home .
+lemonseeds rolls dice and gets dice and dice
+It is a double!
+Move 47 :11:49:08
+lemonseeds moves 4 ➡ home , 4 ➡ home , 4 ➡ home , 5 ➡ 1 .
+charliefooo jellyfis rolls dice and gets dice and dice
+Move 48 :11:49:18
+charliefooo jellyfis moves 3 ➡ home , 2 ➡ home .
+lemonseeds rolls dice and gets dice and dice
+Move 49 :11:49:24
+lemonseeds moves 5 ➡ home , 3 ➡ home .
+charliefooo jellyfis rolls dice and gets dice and dice
+Move 50 :11:49:30
+charliefooo jellyfis moves 2 ➡ home .
+charliefooo jellyfis win the game. 1 points scored.
+End of game`;
+
+  // ---------------------------------------------------------------------
+  // Log parsing
+  // ---------------------------------------------------------------------
+
+  function splitIntoGames(rawText) {
+    const lines = rawText.replace(/\r\n/g, "\n").split("\n");
+    const games = [];
+    let current = [];
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) continue;
+      if (/^Move\s+1\s*:/.test(line) && current.length > 0) {
+        games.push(current);
+        current = [];
+      }
+      current.push(line);
+    }
+    if (current.length > 0) games.push(current);
+    return games;
+  }
+
+  function parseMoveSegments(text) {
+    // Split on commas; each segment describes one die's checker movement.
+    const segments = text.split(",").map(s => s.trim()).filter(Boolean);
+    const hops = [];
+    for (const seg of segments) {
+      const cleaned = seg.replace(/\.$/, "").trim();
+      const m = cleaned.match(/^(bar|\d+)\s*(?:➡|→)\s*(home|\d+)\s*(hitting)?\s*$/i);
+      if (!m) return null;
+      hops.push({ from: m[1].toLowerCase(), to: m[2].toLowerCase(), hit: !!m[3] });
+    }
+    return hops;
+  }
+
+  function parseGame(lines, warnings, gameLabel) {
+    const turns = [];
+    let lastRoller = null;
+    const pendingDouble = Object.create(null);
+    let winner = null, points = null;
+    let dateStr = null;
+    let currentMoveNumber = null;
+
+    for (const line of lines) {
+      let m;
+
+      if ((m = line.match(/^Move\s+(\d+)\s*:\s*(?:(\d{2})\/(\d{2})\/(\d{4}))?/))) {
+        currentMoveNumber = parseInt(m[1], 10);
+        if (m[2] && !dateStr) dateStr = `${m[4]}.${m[3]}.${m[2]}`;
+        continue;
+      }
+      if (/^End of game\.?$/i.test(line)) continue;
+
+      if ((m = line.match(/^(.+?)\s+rolls dice and gets dice.*$/i))) {
+        lastRoller = m[1].trim();
+        continue;
+      }
+
+      if (/^It is a double!$/i.test(line)) {
+        if (lastRoller) pendingDouble[lastRoller] = true;
+        continue;
+      }
+
+      if ((m = line.match(/^(.+?)\s+wins?\s+the\s+game\.?\s*(\d+)\s*points?\s*scored\.?$/i))) {
+        winner = m[1].trim();
+        points = parseInt(m[2], 10);
+        continue;
+      }
+
+      if ((m = line.match(/^(.+?)\s+moves\s+(.+?)\.?\s*$/i))) {
+        const player = m[1].trim();
+        const hops = parseMoveSegments(m[2]);
+        if (!hops || hops.length === 0) {
+          warnings.push({ type: "warn", text: `${gameLabel}: could not parse move line: "${line}"` });
+          continue;
+        }
+        const isDouble = !!pendingDouble[player];
+        if (isDouble) delete pendingDouble[player];
+        turns.push({ player, hops, isDouble, moveNumber: currentMoveNumber });
+        continue;
+      }
+
+      // Unrecognised line - ignore quietly (e.g. chat, timestamps-only lines).
+    }
+
+    return { turns, winner, points, dateStr };
+  }
+
+  // ---------------------------------------------------------------------
+  // Board simulation (per player, in that player's own 24->1 frame)
+  // ---------------------------------------------------------------------
+
+  function newBoard() {
+    const points = new Array(25).fill(0); // index 1..24 used
+    points[24] = 2;
+    points[13] = 5;
+    points[8] = 3;
+    points[6] = 5;
+    return { points, bar: 0, off: 0 };
+  }
+
+  // Applies one hop to the mover's board (and the opponent's, if it was a hit).
+  // Returns die information: { certain: true, value } or { certain: false, min }.
+  function applyHop(mover, opponent, hop) {
+    const isBearOff = hop.to === "home";
+    const fromNum = hop.from === "bar" ? 25 : parseInt(hop.from, 10);
+    const toNum = isBearOff ? 0 : parseInt(hop.to, 10);
+
+    let dieInfo;
+    if (hop.from === "bar") {
+      dieInfo = { certain: true, value: 25 - toNum };
+    } else if (isBearOff) {
+      let hasHigher = false;
+      for (let p = fromNum + 1; p <= 6; p++) {
+        if (mover.points[p] > 0) { hasHigher = true; break; }
+      }
+      // Bearing off from the 6-point is always exact: there is no higher
+      // point in the home board, so no die value could be "overage" here.
+      dieInfo = (hasHigher || fromNum === 6) ? { certain: true, value: fromNum } : { certain: false, min: fromNum };
+    } else {
+      dieInfo = { certain: true, value: Math.abs(fromNum - toNum) };
+    }
+
+    // Mutate mover board.
+    if (hop.from === "bar") mover.bar = Math.max(0, mover.bar - 1);
+    else mover.points[fromNum] = Math.max(0, mover.points[fromNum] - 1);
+
+    if (isBearOff) {
+      mover.off += 1;
+    } else {
+      mover.points[toNum] += 1;
+      if (hop.hit && opponent) {
+        const oppPoint = 25 - toNum;
+        opponent.points[oppPoint] = Math.max(0, opponent.points[oppPoint] - 1);
+        opponent.bar += 1;
+      }
+    }
+
+    return dieInfo;
+  }
+
+  function clampDie(n) {
+    if (n < 1) return 1;
+    if (n > 6) return 6;
+    return n;
+  }
+
+  function resolveDice(dieInfos, isDouble) {
+    if (dieInfos.length === 0) {
+      return { dice: [1, 1], ambiguous: true };
+    }
+
+    if (isDouble) {
+      let val = 1;
+      let ambiguous = false;
+      for (const d of dieInfos) {
+        const v = d.certain ? d.value : d.min;
+        ambiguous = ambiguous || !d.certain;
+        if (v > val) val = v;
+      }
+      return { dice: [val, val], ambiguous };
+    }
+
+    if (dieInfos.length === 1) {
+      const d0 = dieInfos[0];
+      const known = d0.certain ? d0.value : d0.min;
+      const other = known === 6 ? 5 : 6;
+      return { dice: [known, other], ambiguous: true, unplayedDieGuessed: !d0.certain || true };
+    }
+
+    if (dieInfos.length === 2) {
+      const [a, b] = dieInfos;
+      if (a.certain && b.certain) {
+        return { dice: [a.value, b.value], ambiguous: false };
+      }
+      if (a.certain && !b.certain) {
+        let val = clampDie(b.min);
+        if (val === a.value) val = clampDie(val === 6 ? val - 1 : val + 1);
+        return { dice: [a.value, val], ambiguous: true };
+      }
+      if (!a.certain && b.certain) {
+        let val = clampDie(a.min);
+        if (val === b.value) val = clampDie(val === 6 ? val - 1 : val + 1);
+        return { dice: [val, b.value], ambiguous: true };
+      }
+      let v1 = clampDie(a.min);
+      let v2 = clampDie(b.min);
+      if (v1 === v2) v2 = clampDie(v2 === 6 ? v2 - 1 : v2 + 1);
+      return { dice: [v1, v2], ambiguous: true };
+    }
+
+    // More hops than expected without a flagged double: fall back to the
+    // same "largest lower-bound" reasoning used for doubles.
+    let val = 1;
+    for (const d of dieInfos) {
+      const v = d.certain ? d.value : d.min;
+      if (v > val) val = v;
+    }
+    return { dice: [val, val], ambiguous: true };
+  }
+
+  function pointText(p) {
+    return p === "home" ? "off" : p;
+  }
+
+  function formatMoveTokens(hops) {
+    const tokens = [];
+    let i = 0;
+    while (i < hops.length) {
+      let token = pointText(hops[i].from) + "/" + pointText(hops[i].to) + (hops[i].hit ? "*" : "");
+      let lastTo = hops[i].to;
+      let j = i + 1;
+      while (j < hops.length && lastTo !== "home" && hops[j].from === lastTo) {
+        token += "/" + pointText(hops[j].to) + (hops[j].hit ? "*" : "");
+        lastTo = hops[j].to;
+        j++;
+      }
+      tokens.push(token);
+      i = j;
+    }
+    return tokens.join(" ");
+  }
+
+  // ---------------------------------------------------------------------
+  // .mat generation
+  // ---------------------------------------------------------------------
+
+  function padEnd(str, len) {
+    return str.length >= len ? str : str + " ".repeat(len - str.length);
+  }
+
+  function convertLog(rawText, matchLength, warnings) {
+    const gameLineGroups = splitIntoGames(rawText);
+    if (gameLineGroups.length === 0) {
+      warnings.push({ type: "err", text: "No games found in the pasted log." });
+      return null;
+    }
+
+    const parsedGames = gameLineGroups.map((lines, idx) =>
+      parseGame(lines, warnings, `Game ${idx + 1}`)
+    );
+
+    // Determine consistent column assignment across the whole match:
+    // column 0 is whoever made the very first move of the match.
+    let col0Player = null, col1Player = null;
+    for (const g of parsedGames) {
+      for (const t of g.turns) {
+        if (!col0Player) col0Player = t.player;
+        else if (t.player !== col0Player && !col1Player) col1Player = t.player;
+        if (col0Player && col1Player) break;
+      }
+      if (col0Player && col1Player) break;
+    }
+    if (!col0Player || !col1Player) {
+      warnings.push({ type: "err", text: "Could not identify two players in the log." });
+      return null;
+    }
+
+    let score0 = 0, score1 = 0;
+    const gameBlocks = [];
+    let dateStr = null;
+
+    parsedGames.forEach((game, gameIdx) => {
+      const gameLabel = `Game ${gameIdx + 1}`;
+      if (game.dateStr && !dateStr) dateStr = game.dateStr;
+
+      const board0 = newBoard();
+      const board1 = newBoard();
+      const boards = { [col0Player]: board0, [col1Player]: board1 };
+
+      const cells = [];
+      game.turns.forEach((turn, turnIdx) => {
+        const mover = boards[turn.player];
+        const opponentName = turn.player === col0Player ? col1Player : col0Player;
+        const opponent = boards[opponentName];
+        if (!mover) {
+          warnings.push({ type: "err", text: `${gameLabel}: unknown player "${turn.player}"` });
+          return;
+        }
+
+        const dieInfos = turn.hops.map(hop => applyHop(mover, opponent, hop));
+        const { dice, ambiguous } = resolveDice(dieInfos, turn.isDouble);
+
+        if (ambiguous) {
+          warnings.push({
+            type: "warn",
+            text: `${gameLabel}, BGA move ${turn.moveNumber != null ? turn.moveNumber : turnIdx + 1} (${turn.player}): dice ${dice[0]}${dice[1]} partly guessed ` +
+                  `(BGA log did not fully determine both dice for this move).`
+          });
+        }
+
+        const rollPrefix = `${dice[0]}${dice[1]}: `;
+        const text = rollPrefix + formatMoveTokens(turn.hops);
+        cells.push({ col: turn.player === col0Player ? 0 : 1, text });
+      });
+
+      // Build rows, handling the case where column 1 moves first in a game.
+      const rows = [];
+      let i = 0;
+      if (cells.length && cells[0].col === 1) {
+        rows.push({ col0: "", col1: cells[0].text });
+        i = 1;
+      }
+      while (i < cells.length) {
+        let c0 = "", c1 = "";
+        if (cells[i].col === 0) {
+          c0 = cells[i].text;
+          i++;
+          if (i < cells.length && cells[i].col === 1) {
+            c1 = cells[i].text;
+            i++;
+          }
+        } else {
+          c1 = cells[i].text;
+          i++;
+        }
+        rows.push({ col0: c0, col1: c1 });
+      }
+
+      const rowLines = rows.map((row, idx) => {
+        const numStr = String(idx + 1).padStart(3, " ") + ") ";
+        if (row.col0 && row.col1) {
+          return numStr + padEnd(row.col0, 27) + " " + row.col1;
+        } else if (row.col0 && !row.col1) {
+          return numStr + row.col0;
+        } else {
+          return " ".repeat(numStr.length + 27 + 1) + row.col1;
+        }
+      });
+
+      const scoreBefore0 = score0, scoreBefore1 = score1;
+      if (game.winner && game.points) {
+        if (game.winner === col0Player) score0 += game.points;
+        else if (game.winner === col1Player) score1 += game.points;
+        else warnings.push({ type: "warn", text: `${gameLabel}: winner "${game.winner}" did not match either player name.` });
+      } else {
+        warnings.push({ type: "warn", text: `${gameLabel}: no game result ("wins the game") line found; score not updated.` });
+      }
+
+      const scoreLeft = `${col0Player} : ${scoreBefore0}`;
+      const scoreLine = " " + padEnd(scoreLeft, 31) + `${col1Player} : ${scoreBefore1}`;
+
+      gameBlocks.push(` Game ${gameIdx + 1}\n${scoreLine}\n${rowLines.join("\n")}\n`);
+    });
+
+    let header = `; [Site "Board Game Arena"]\n`;
+    if (dateStr) header += `; [EventDate "${dateStr}"]\n`;
+    header += `\n ${matchLength} point match\n\n`;
+
+    return header + gameBlocks.join("\n");
+  }
+
+  // ---------------------------------------------------------------------
+  // UI wiring
+  // ---------------------------------------------------------------------
+
+  const inputLog = document.getElementById("inputLog");
+  const outputMat = document.getElementById("outputMat");
+  const messagesEl = document.getElementById("messages");
+  const matchLengthEl = document.getElementById("matchLength");
+
+  function renderMessages(warnings) {
+    messagesEl.textContent = "";
+    if (warnings.length === 0) {
+      const div = document.createElement("div");
+      div.className = "info";
+      div.textContent = "Converted with no warnings.";
+      messagesEl.appendChild(div);
+      return;
+    }
+    for (const w of warnings) {
+      const div = document.createElement("div");
+      div.className = w.type;
+      div.textContent = w.text;
+      messagesEl.appendChild(div);
+    }
+  }
+
+  function doConvert() {
+    const warnings = [];
+    const matchLength = Math.max(0, parseInt(matchLengthEl.value, 10) || 0);
+    let result = null;
+    try {
+      result = convertLog(inputLog.value, matchLength, warnings);
+    } catch (e) {
+      warnings.push({ type: "err", text: "Unexpected error: " + e.message });
+    }
+    outputMat.value = result || "";
+    renderMessages(warnings);
+  }
+
+  document.getElementById("convertBtn").addEventListener("click", doConvert);
+
+  document.getElementById("exampleBtn").addEventListener("click", () => {
+    inputLog.value = EXAMPLE_LOG;
+    doConvert();
+  });
+
+  document.getElementById("clearBtn").addEventListener("click", () => {
+    inputLog.value = "";
+    outputMat.value = "";
+    messagesEl.textContent = "";
+  });
+
+  document.getElementById("copyBtn").addEventListener("click", async () => {
+    if (!outputMat.value) return;
+    try {
+      await navigator.clipboard.writeText(outputMat.value);
+    } catch (e) {
+      outputMat.select();
+      document.execCommand("copy");
+    }
+  });
+
+  document.getElementById("downloadBtn").addEventListener("click", () => {
+    if (!outputMat.value) return;
+    const blob = new Blob([outputMat.value], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    //put date in filename to avoid overwriting previous downloads yyyy-mm-dd
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const filename = `bga_${year}-${month}-${day}.mat`;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+})();
+</script>
+
+</body>
+</html>
