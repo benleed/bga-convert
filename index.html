@@ -110,6 +110,7 @@
   </label>
   <button id="convertBtn">Convert</button>
   <button id="exampleBtn" class="secondary">Load example</button>
+  <button id="exampleMatchBtn" class="secondary">Load cube/match example</button>
   <button id="clearBtn" class="secondary">Clear</button>
 </div>
 
@@ -130,12 +131,16 @@
 </div>
 
 <footer>
-  Notes: cube actions (double/take/drop) and resignations are not present in this BGA log format and are not handled.
-  When BGA shows only one checker move for a roll (the other die could not be played, or the game ended after bearing
-  off the last checker), the unused die's value cannot be recovered from the log and is guessed &mdash; this is flagged
-  in the messages panel. Bear-off "overage" (e.g. bearing off a 3-point with a 5 because no higher points are occupied)
-  is detected by simulating the board, so doubles that mix exact and overage bear-offs (like <code>4/off 4/off 3/off 3/off</code>
-  for a rolled double-4) are reconstructed correctly.
+  Notes: when BGA shows only one checker move for a roll (the other die could not be played, or the game ended after
+  bearing off the last checker), the unused die's value cannot be recovered from the log and is guessed &mdash; this
+  is flagged in the messages panel. Bear-off "overage" (e.g. bearing off a 3-point with a 5 because no higher points
+  are occupied) is detected by simulating the board, so doubles that mix exact and overage bear-offs (like
+  <code>4/off 4/off 3/off 3/off</code> for a rolled double-4) are reconstructed correctly.
+  Taking a double is recognised from BGA's "accepts the cube" line; BGA's log doesn't record the double offer itself
+  or a drop directly, so both are inferred from a gap in the move numbering right before a "wins the game" line (as
+  opposed to a forfeit, which is stated explicitly, or a normal bear-off win, which follows straight on from the
+  winning move). The match length isn't present in the log either, so it is guessed from the final score reached and
+  can be overridden using the "Match length" field before converting again.
 </footer>
 
 <script>
@@ -301,6 +306,276 @@ charliefooo jellyfis moves 2 ➡ home .
 charliefooo jellyfis win the game. 1 points scored.
 End of game`;
 
+  const EXAMPLE_MATCH_LOG = `Move 1 :28/07/2026 12:51:40
+New game
+lemonseeds rolls dice and gets dice and dice
+Move 2 :12:51:51
+lemonseeds moves 24 ➡ 23 , 13 ➡ 11 .
+Move 3 :12:51:56
+Serenity Now rolls dice and gets dice and dice
+Move 4 :12:52:01
+Serenity Now moves 8 ➡ 4 , 6 ➡ 4 .
+Move 5 :12:52:05
+lemonseeds rolls dice and gets dice and dice
+It is a double!
+Move 6 :12:52:28
+lemonseeds moves 6 ➡ 5 , 6 ➡ 5 , 24 ➡ 23 , 8 ➡ 7 .
+Move 7 :12:52:36
+Serenity Now rolls dice and gets dice and dice
+Move 8 :12:52:46
+Serenity Now moves 13 ➡ 8 , 13 ➡ 11 .
+Move 9 :12:52:52
+lemonseeds rolls dice and gets dice and dice
+It is a double!
+Move 10 :12:53:13
+lemonseeds moves 11 ➡ 10 , 10 ➡ 9 , 9 ➡ 8 , 8 ➡ 7 .
+Move 11 :12:53:20
+Serenity Now rolls dice and gets dice and dice
+Move 12 :12:53:35
+Serenity Now moves 11 ➡ 5 , 6 ➡ 1 .
+Move 13 :12:53:40
+lemonseeds rolls dice and gets dice and dice
+Move 14 :12:53:56
+lemonseeds moves 23 ➡ 20 hitting   , 23 ➡ 18 .
+Move 15 :12:54:03
+Serenity Now rolls dice and gets dice and dice
+Move 16 :12:54:10
+Serenity Now moves bar ➡ 21 , 6 ➡ 1 .
+Move 17 :12:54:14
+lemonseeds rolls dice and gets dice and dice
+Move 18 :12:54:26
+lemonseeds moves 6 ➡ 4 hitting   , 8 ➡ 4 .
+Move 19 :12:54:32
+Serenity Now rolls dice and gets dice and dice
+Move 20 :12:54:35
+Serenity Now moves bar ➡ 23 , 23 ➡ 17 hitting   .
+Move 21 :12:54:42
+lemonseeds rolls dice and gets dice and dice
+Move 22 :12:54:59
+lemonseeds moves bar ➡ 22 , 7 ➡ 6 .
+Move 23 :12:55:04
+Serenity Now rolls dice and gets dice and dice
+It is a double!
+Move 24 :12:55:22
+Serenity Now moves 13 ➡ 9 , 9 ➡ 5 hitting   , 13 ➡ 9 , 9 ➡ 5 .
+Move 25 :12:55:30
+lemonseeds rolls dice and gets dice and dice
+Move 26 :12:55:37
+Serenity Now rolls dice and gets dice and dice
+Move 27 :12:55:49
+Serenity Now moves 17 ➡ 13 , 8 ➡ 3 hitting   .
+Move 28 :12:55:55
+lemonseeds rolls dice and gets dice and dice
+Move 29 :12:55:59
+lemonseeds moves bar ➡ 22 hitting   .
+Move 30 :12:56:04
+Serenity Now rolls dice and gets dice and dice
+Move 31 :12:56:09
+Serenity Now moves bar ➡ 22 , 22 ➡ 18 hitting   .
+Move 32 :12:56:14
+lemonseeds rolls dice and gets dice and dice
+It is a double!
+Move 33 :12:56:30
+lemonseeds moves bar ➡ 22 , bar ➡ 22 , 13 ➡ 10 , 10 ➡ 7 hitting   .
+Move 34 :12:56:38
+Serenity Now rolls dice and gets dice and dice
+Move 35 :12:56:45
+Serenity Now moves bar ➡ 22 , 8 ➡ 7 hitting   .
+Move 36 :12:56:50
+lemonseeds rolls dice and gets dice and dice
+Move 37 :12:56:57
+Serenity Now rolls dice and gets dice and dice
+Move 38 :12:57:03
+Serenity Now moves 24 ➡ 18 hitting   , 8 ➡ 7 .
+Move 39 :12:57:08
+lemonseeds rolls dice and gets dice and dice
+Move 40 :12:57:11
+lemonseeds moves bar ➡ 22 .
+Move 41 :12:57:14
+Serenity Now rolls dice and gets dice and dice
+Move 42 :12:57:20
+Serenity Now moves 24 ➡ 22 , 18 ➡ 13 .
+Move 43 :12:57:25
+lemonseeds rolls dice and gets dice and dice
+It is a double!
+Move 44 :12:57:52
+lemonseeds moves bar ➡ 22 , 13 ➡ 10 , 13 ➡ 10 , 13 ➡ 10 .
+Move 45 :12:57:59
+Serenity Now rolls dice and gets dice and dice
+Move 46 :12:58:10
+Serenity Now moves 7 ➡ 6 , 7 ➡ 4 .
+Move 47 :12:58:20
+lemonseeds rolls dice and gets dice and dice
+It is a double!
+Move 48 :12:58:48
+lemonseeds moves 10 ➡ 8 , 10 ➡ 8 , 10 ➡ 8 , 6 ➡ 4 .
+Move 50 :12:59:10
+Serenity Now win the game. 1 points scored.
+New game
+New game
+Serenity Now rolls dice and gets dice and dice
+Move 51 :12:59:30
+Serenity Now moves 13 ➡ 11 , 24 ➡ 23 .
+Move 52 :12:59:34
+lemonseeds rolls dice and gets dice and dice
+Move 53 :12:59:45
+lemonseeds moves 13 ➡ 7 , 8 ➡ 7 .
+Move 54 :12:59:49
+Serenity Now rolls dice and gets dice and dice
+Move 55 :13:00:00
+Serenity Now moves 8 ➡ 3 , 6 ➡ 3 .
+Move 56 :13:00:04
+lemonseeds rolls dice and gets dice and dice
+It is a double!
+Move 57 :13:00:19
+lemonseeds moves 6 ➡ 2 hitting   , 6 ➡ 2 , 24 ➡ 20 , 24 ➡ 20 .
+Move 58 :13:00:27
+Serenity Now rolls dice and gets dice and dice
+Move 60 :13:00:39
+lemonseeds win the game. 1 points scored.
+New game
+New game
+lemonseeds rolls dice and gets dice and dice
+Move 61 :13:00:50
+lemonseeds moves 24 ➡ 23 , 13 ➡ 11 .
+Move 62 :13:00:54
+Serenity Now rolls dice and gets dice and dice
+Move 63 :13:00:58
+Serenity Now moves 13 ➡ 11 , 24 ➡ 23 .
+Move 64 :13:01:02
+lemonseeds rolls dice and gets dice and dice
+Move 65 :13:01:15
+lemonseeds moves 6 ➡ 3 , 8 ➡ 3 .
+Move 66 :13:01:20
+Serenity Now rolls dice and gets dice and dice
+Move 67 :13:01:44
+Serenity Now moves 8 ➡ 2 hitting   , 13 ➡ 11 .
+Move 68 :13:01:52
+lemonseeds rolls dice and gets dice and dice
+Move 69 :13:02:26
+lemonseeds moves bar ➡ 23 hitting   , 13 ➡ 9 .
+Move 70 :13:02:32
+Serenity Now rolls dice and gets dice and dice
+It is a double!
+Move 71 :13:02:43
+lemonseeds rolls dice and gets dice and dice
+Move 72 :13:03:19
+lemonseeds moves 9 ➡ 4 , 8 ➡ 4 .
+Move 73 :13:03:23
+Serenity Now rolls dice and gets dice and dice
+Move 74 :13:03:33
+lemonseeds rolls dice and gets dice and dice
+Move 75 :13:03:55
+lemonseeds moves 11 ➡ 8 , 23 ➡ 21 .
+Move 76 :13:04:00
+Serenity Now rolls dice and gets dice and dice
+Move 77 :13:04:07
+Serenity Now moves bar ➡ 23 , 24 ➡ 18 .
+Move 78 :13:04:11
+lemonseeds rolls dice and gets dice and dice
+Move 79 :13:04:25
+lemonseeds moves 24 ➡ 21 , 13 ➡ 8 .
+Move 80 :13:04:29
+Serenity Now rolls dice and gets dice and dice
+Move 81 :13:04:38
+Serenity Now moves 18 ➡ 14 , 14 ➡ 13 .
+Move 83 :13:04:55
+Serenity Now accepts the cube
+lemonseeds rolls dice and gets dice and dice
+Move 84 :13:05:13
+lemonseeds moves 21 ➡ 15 , 15 ➡ 11 .
+Serenity Now rolls dice and gets dice and dice
+It is a double!
+Move 85 :13:05:37
+Serenity Now moves 23 ➡ 18 , 23 ➡ 18 , 13 ➡ 8 , 13 ➡ 8 .
+lemonseeds rolls dice and gets dice and dice
+Move 86 :13:05:52
+lemonseeds moves 13 ➡ 11 , 13 ➡ 8 .
+Serenity Now rolls dice and gets dice and dice
+Move 87 :13:06:11
+Serenity Now moves 8 ➡ 2 , 8 ➡ 6 .
+lemonseeds rolls dice and gets dice and dice
+Move 88 :13:06:20
+lemonseeds moves 8 ➡ 5 , 6 ➡ 5 .
+Serenity Now rolls dice and gets dice and dice
+Move 89 :13:06:30
+Serenity Now moves 6 ➡ 2 , 6 ➡ 3 .
+lemonseeds rolls dice and gets dice and dice
+Move 90 :13:06:38
+lemonseeds moves 21 ➡ 15 , 15 ➡ 11 .
+Serenity Now rolls dice and gets dice and dice
+Move 91 :13:06:45
+Serenity Now moves 8 ➡ 5 , 6 ➡ 5 .
+lemonseeds rolls dice and gets dice and dice
+Move 92 :13:07:02
+lemonseeds moves 11 ➡ 10 , 10 ➡ 6 .
+Serenity Now rolls dice and gets dice and dice
+It is a double!
+Move 93 :13:07:14
+Serenity Now moves 6 ➡ 3 , 13 ➡ 10 , 10 ➡ 7 , 7 ➡ 4 .
+lemonseeds rolls dice and gets dice and dice
+Move 94 :13:07:44
+lemonseeds moves 6 ➡ 2 , 8 ➡ 5 .
+Serenity Now rolls dice and gets dice and dice
+Move 95 :13:07:58
+Serenity Now moves 13 ➡ 7 , 11 ➡ 6 .
+lemonseeds rolls dice and gets dice and dice
+Move 96 :13:08:07
+lemonseeds moves 11 ➡ 6 , 11 ➡ 5 .
+Serenity Now rolls dice and gets dice and dice
+Move 97 :13:08:18
+Serenity Now moves 8 ➡ 4 , 7 ➡ 4 .
+lemonseeds rolls dice and gets dice and dice
+Move 98 :13:08:25
+lemonseeds moves 8 ➡ 2 , 8 ➡ 4 .
+Serenity Now rolls dice and gets dice and dice
+Move 99 :13:08:32
+Serenity Now moves 18 ➡ 15 , 15 ➡ 14 .
+lemonseeds rolls dice and gets dice and dice
+Move 100 :13:08:47
+lemonseeds moves 2 ➡ home , 5 ➡ 4 .
+Serenity Now rolls dice and gets dice and dice
+Move 101 :13:09:00
+Serenity Now moves 18 ➡ 12 , 14 ➡ 10 .
+lemonseeds rolls dice and gets dice and dice
+It is a double!
+Move 102 :13:09:10
+lemonseeds moves 2 ➡ 1 , 1 ➡ home , 4 ➡ 3 , 3 ➡ 2 .
+Serenity Now rolls dice and gets dice and dice
+Move 103 :13:09:21
+Serenity Now moves 12 ➡ 10 , 10 ➡ 9 .
+lemonseeds rolls dice and gets dice and dice
+Move 104 :13:09:27
+lemonseeds moves 6 ➡ home , 2 ➡ home .
+Serenity Now rolls dice and gets dice and dice
+Move 105 :13:09:35
+Serenity Now moves 11 ➡ 6 , 10 ➡ 6 .
+lemonseeds rolls dice and gets dice and dice
+Move 106 :13:09:43
+lemonseeds moves 5 ➡ home , 3 ➡ home .
+Serenity Now rolls dice and gets dice and dice
+Move 107 :13:09:54
+Serenity Now moves 9 ➡ 4 , 3 ➡ home .
+lemonseeds rolls dice and gets dice and dice
+Move 108 :13:10:02
+lemonseeds moves 4 ➡ home , 3 ➡ home .
+Serenity Now rolls dice and gets dice and dice
+Move 109 :13:10:09
+Serenity Now moves 6 ➡ home , 3 ➡ home .
+lemonseeds rolls dice and gets dice and dice
+Move 110 :13:10:20
+lemonseeds moves 5 ➡ home , 6 ➡ 4 .
+Serenity Now rolls dice and gets dice and dice
+Move 111 :13:10:30
+Serenity Now moves 5 ➡ home , 6 ➡ 4 .
+lemonseeds rolls dice and gets dice and dice
+Move 112 :13:10:37
+lemonseeds moves 5 ➡ home , 4 ➡ home .
+Serenity Now rolls dice and gets dice and dice
+Move 113 :13:10:42
+lemonseeds win by forfeit. 2 points scored.
+End of game`;
+
   // ---------------------------------------------------------------------
   // Log parsing
   // ---------------------------------------------------------------------
@@ -309,14 +584,32 @@ End of game`;
     const lines = rawText.replace(/\r\n/g, "\n").split("\n");
     const games = [];
     let current = [];
+    let hasAction = false;
     for (const rawLine of lines) {
       const line = rawLine.trim();
       if (!line) continue;
-      if (/^Move\s+1\s*:/.test(line) && current.length > 0) {
+
+      // Games after the first don't restart the "Move 1 :" numbering - they are
+      // instead delimited by one or more "New game" marker lines. The very first
+      // "New game" (right after the match's opening "Move 1 :" header) is not a
+      // delimiter, so only split once real gameplay has been seen since the last split.
+      if (/^New game\.?$/i.test(line)) {
+        if (hasAction) {
+          games.push(current);
+          current = [];
+          hasAction = false;
+        }
+        continue;
+      }
+      if (/^Move\s+1\s*:/.test(line) && hasAction) {
         games.push(current);
         current = [];
+        hasAction = false;
       }
       current.push(line);
+      if (/rolls dice|moves\s|wins?\s+the\s+game|wins?\s+by\s+forfeit/i.test(line)) {
+        hasAction = true;
+      }
     }
     if (current.length > 0) games.push(current);
     return games;
@@ -339,9 +632,16 @@ End of game`;
     const turns = [];
     let lastRoller = null;
     const pendingDouble = Object.create(null);
+    const playersSeen = new Set();
     let winner = null, points = null;
     let dateStr = null;
     let currentMoveNumber = null;
+    // BGA's log does not contain a line for offering the cube, or for dropping it.
+    // A "Move N :" header line is otherwise always followed immediately by either a
+    // "rolls dice" or a "moves" line for the same turn. When a header is instead
+    // followed directly by a "wins the game" line (nothing in between), the gap
+    // represents a silent double offer followed by a drop.
+    let freshHeaderPending = false;
 
     for (const line of lines) {
       let m;
@@ -349,28 +649,75 @@ End of game`;
       if ((m = line.match(/^Move\s+(\d+)\s*:\s*(?:(\d{2})\/(\d{2})\/(\d{4}))?/))) {
         currentMoveNumber = parseInt(m[1], 10);
         if (m[2] && !dateStr) dateStr = `${m[4]}.${m[3]}.${m[2]}`;
+        freshHeaderPending = true;
         continue;
       }
-      if (/^End of game\.?$/i.test(line)) continue;
+      if (/^End of game\.?$/i.test(line)) { freshHeaderPending = false; continue; }
 
       if ((m = line.match(/^(.+?)\s+rolls dice and gets dice.*$/i))) {
         lastRoller = m[1].trim();
+        playersSeen.add(lastRoller);
+        freshHeaderPending = false;
         continue;
       }
 
       if (/^It is a double!$/i.test(line)) {
         if (lastRoller) pendingDouble[lastRoller] = true;
+        freshHeaderPending = false;
+        continue;
+      }
+
+      if ((m = line.match(/^(.+?)\s+accepts the cube\.?$/i))) {
+        const taker = m[1].trim();
+        playersSeen.add(taker);
+        const doubler = [...playersSeen].find(p => p !== taker) || null;
+        if (!doubler) {
+          warnings.push({ type: "warn", text: `${gameLabel}: could not identify the doubler for "${line}"` });
+        } else {
+          turns.push({ kind: "take", taker, doubler, moveNumber: currentMoveNumber });
+        }
+        freshHeaderPending = false;
+        continue;
+      }
+
+      if ((m = line.match(/^(.+?)\s+wins?\s+by\s+forfeit\.?\s*(\d+)\s*points?\s*scored\.?$/i))) {
+        winner = m[1].trim();
+        points = parseInt(m[2], 10);
+        freshHeaderPending = false;
         continue;
       }
 
       if ((m = line.match(/^(.+?)\s+wins?\s+the\s+game\.?\s*(\d+)\s*points?\s*scored\.?$/i))) {
         winner = m[1].trim();
         points = parseInt(m[2], 10);
+        if (freshHeaderPending && lastRoller) {
+          const dropper = lastRoller;
+          const doubler = [...playersSeen].find(p => p !== dropper) || null;
+          if (doubler) {
+            if (doubler !== winner) {
+              warnings.push({
+                type: "warn",
+                text: `${gameLabel}: detected an unlogged cube double/drop, but the inferred winner ("${doubler}") ` +
+                      `does not match the logged winner ("${winner}"); scoring uses the logged winner.`
+              });
+            }
+            turns.push({ kind: "drop", dropper, doubler, points, moveNumber: currentMoveNumber });
+          } else {
+            warnings.push({
+              type: "warn",
+              text: `${gameLabel}: the game result was preceded by an unexplained gap in the move log (likely a ` +
+                    `cube double/drop) but both players could not be identified, so no cube action was recorded.`
+            });
+          }
+        }
+        freshHeaderPending = false;
         continue;
       }
 
       if ((m = line.match(/^(.+?)\s+moves\s+(.+?)\.?\s*$/i))) {
         const player = m[1].trim();
+        playersSeen.add(player);
+        freshHeaderPending = false;
         const hops = parseMoveSegments(m[2]);
         if (!hops || hops.length === 0) {
           warnings.push({ type: "warn", text: `${gameLabel}: could not parse move line: "${line}"` });
@@ -378,11 +725,12 @@ End of game`;
         }
         const isDouble = !!pendingDouble[player];
         if (isDouble) delete pendingDouble[player];
-        turns.push({ player, hops, isDouble, moveNumber: currentMoveNumber });
+        turns.push({ kind: "move", player, hops, isDouble, moveNumber: currentMoveNumber });
         continue;
       }
 
       // Unrecognised line - ignore quietly (e.g. chat, timestamps-only lines).
+      freshHeaderPending = false;
     }
 
     return { turns, winner, points, dateStr };
@@ -547,6 +895,7 @@ End of game`;
     let col0Player = null, col1Player = null;
     for (const g of parsedGames) {
       for (const t of g.turns) {
+        if (t.kind !== "move") continue;
         if (!col0Player) col0Player = t.player;
         else if (t.player !== col0Player && !col1Player) col1Player = t.player;
         if (col0Player && col1Player) break;
@@ -571,7 +920,34 @@ End of game`;
       const boards = { [col0Player]: board0, [col1Player]: board1 };
 
       const cells = [];
+      let cubeValue = 1;
+
+      // The doubler's cell is always chronologically immediately followed by the
+      // responder's cell, so pushing them in that order (doubler, then responder)
+      // naturally preserves correct column alternation with whatever cell came
+      // before - regardless of which column the doubler happens to occupy.
       game.turns.forEach((turn, turnIdx) => {
+        if (turn.kind === "take") {
+          const newCube = cubeValue * 2;
+          cubeValue = newCube;
+          cells.push({ col: turn.doubler === col0Player ? 0 : 1, text: `Doubles => ${newCube}` });
+          cells.push({ col: turn.taker === col0Player ? 0 : 1, text: "Takes" });
+          return;
+        }
+
+        if (turn.kind === "drop") {
+          const wonPoints = cubeValue;
+          const newCube = cubeValue * 2;
+          const winsText = `Wins ${wonPoints} point${wonPoints === 1 ? "" : "s"}`;
+          const dropCol = turn.dropper === col0Player ? 0 : 1;
+          const dropText = dropCol === 0
+            ? `Drops                       ${winsText}`
+            : `Drops\n                              ${winsText}`;
+          cells.push({ col: turn.doubler === col0Player ? 0 : 1, text: `Doubles => ${newCube}` });
+          cells.push({ col: dropCol, text: dropText });
+          return;
+        }
+
         const mover = boards[turn.player];
         const opponentName = turn.player === col0Player ? col1Player : col0Player;
         const opponent = boards[opponentName];
@@ -645,11 +1021,23 @@ End of game`;
       gameBlocks.push(` Game ${gameIdx + 1}\n${scoreLine}\n${rowLines.join("\n")}\n`);
     });
 
+    // The BGA log never states the match length, so guess it from the final score:
+    // a completed match's winner must have reached at least the match length.
+    const finalScoreMax = Math.max(score0, score1);
+    const usedLength = finalScoreMax > matchLength ? finalScoreMax : matchLength;
+    if (finalScoreMax > matchLength) {
+      warnings.push({
+        type: "warn",
+        text: `Match length was not stated in the log; guessed ${usedLength} point${usedLength === 1 ? "" : "s"} ` +
+              `from the final score (${score0}-${score1}). Change the "Match length" field and convert again if this is wrong.`
+      });
+    }
+
     let header = `; [Site "Board Game Arena"]\n`;
     if (dateStr) header += `; [EventDate "${dateStr}"]\n`;
-    header += `\n ${matchLength} point match\n\n`;
+    header += `\n ${usedLength} point match\n\n`;
 
-    return header + gameBlocks.join("\n");
+    return { text: header + gameBlocks.join("\n"), usedLength };
   }
 
   // ---------------------------------------------------------------------
@@ -687,7 +1075,14 @@ End of game`;
     } catch (e) {
       warnings.push({ type: "err", text: "Unexpected error: " + e.message });
     }
-    outputMat.value = result || "";
+    if (result) {
+      outputMat.value = result.text;
+      if (result.usedLength !== matchLength) {
+        matchLengthEl.value = String(result.usedLength);
+      }
+    } else {
+      outputMat.value = "";
+    }
     renderMessages(warnings);
   }
 
@@ -695,6 +1090,11 @@ End of game`;
 
   document.getElementById("exampleBtn").addEventListener("click", () => {
     inputLog.value = EXAMPLE_LOG;
+    doConvert();
+  });
+
+  document.getElementById("exampleMatchBtn").addEventListener("click", () => {
+    inputLog.value = EXAMPLE_MATCH_LOG;
     doConvert();
   });
 
