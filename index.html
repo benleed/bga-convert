@@ -673,9 +673,8 @@ End of game`;
         const doubler = [...playersSeen].find(p => p !== taker) || null;
         if (!doubler) {
           warnings.push({ type: "warn", text: `${gameLabel}: could not identify the doubler for "${line}"` });
-        } else {
-          turns.push({ kind: "take", taker, doubler, moveNumber: currentMoveNumber });
-        }
+        } 
+        turns.push({ kind: "take", taker, doubler, moveNumber: currentMoveNumber });
         freshHeaderPending = false;
         continue;
       }
@@ -740,6 +739,16 @@ End of game`;
       // Unrecognised line - ignore quietly (e.g. chat, timestamps-only lines).
       freshHeaderPending = false;
     }
+    //fix up missing doubler by infering from taker
+    turns.forEach(turn => {
+      if (turn.kind === "take" && !turn.doubler) {
+        const otherPlayer = [...playersSeen].find(p => p !== turn.taker) || null;
+        if (otherPlayer) {
+          turn.doubler = otherPlayer;
+          warnings.push({ type: "warn", text: `${gameLabel}: inferred missing doubler for take by "${turn.taker}" as "${otherPlayer}"` });
+        }
+      }
+    });
 
     return { turns, winner, points, winType, dateStr };
   }
