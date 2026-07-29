@@ -728,6 +728,7 @@ End of game`;
         const hops = parseMoveSegments(m[2]);
         if (!hops || hops.length === 0) {
           warnings.push({ type: "warn", text: `${gameLabel}: could not parse move line: "${line}"` });
+          delete pendingDouble[player];
           continue;
         }
         const isDouble = !!pendingDouble[player];
@@ -807,6 +808,21 @@ End of game`;
       return { dice: [1, 1], ambiguous: true };
     }
 
+    // A genuine double always plays the same die value on every hop. If two or more hops
+    // have independently-certain (unambiguous) die values that disagree, the move cannot
+    // actually be a double - the "It is a double!" flag must have been misattributed (e.g.
+    // a stale flag left over from an earlier turn, such as when a checker enters from the
+    // bar alongside another checker using a different die value). Fall back to resolving
+    // it as a normal (non-double) roll instead of forcing mismatched values together.
+    let doubleFlagIgnored = false;
+    if (isDouble) {
+      const certainValues = dieInfos.filter(d => d.certain).map(d => d.value);
+      if (certainValues.length >= 2 && certainValues.some(v => v !== certainValues[0])) {
+        isDouble = false;
+        doubleFlagIgnored = true;
+      }
+    }
+
     if (isDouble) {
       let val = 1;
       let ambiguous = false;
@@ -828,22 +844,22 @@ End of game`;
     if (dieInfos.length === 2) {
       const [a, b] = dieInfos;
       if (a.certain && b.certain) {
-        return { dice: [a.value, b.value], ambiguous: false };
+        return { dice: [a.value, b.value], ambiguous: false, doubleFlagIgnored };
       }
       if (a.certain && !b.certain) {
         let val = clampDie(b.min);
         if (val === a.value) val = clampDie(val === 6 ? val - 1 : val + 1);
-        return { dice: [a.value, val], ambiguous: true };
+        return { dice: [a.value, val], ambiguous: true, doubleFlagIgnored };
       }
       if (!a.certain && b.certain) {
         let val = clampDie(a.min);
         if (val === b.value) val = clampDie(val === 6 ? val - 1 : val + 1);
-        return { dice: [val, b.value], ambiguous: true };
+        return { dice: [val, b.value], ambiguous: true, doubleFlagIgnored };
       }
       let v1 = clampDie(a.min);
       let v2 = clampDie(b.min);
       if (v1 === v2) v2 = clampDie(v2 === 6 ? v2 - 1 : v2 + 1);
-      return { dice: [v1, v2], ambiguous: true };
+      return { dice: [v1, v2], ambiguous: true, doubleFlagIgnored };
     }
 
     // More hops than expected without a flagged double: fall back to the
@@ -853,7 +869,7 @@ End of game`;
       const v = d.certain ? d.value : d.min;
       if (v > val) val = v;
     }
-    return { dice: [val, val], ambiguous: true };
+    return { dice: [val, val], ambiguous: true, doubleFlagIgnored };
   }
 
   function pointText(p) {
@@ -964,7 +980,15 @@ End of game`;
         }
 
         const dieInfos = turn.hops.map(hop => applyHop(mover, opponent, hop));
-        const { dice, ambiguous } = resolveDice(dieInfos, turn.isDouble);
+        const { dice, ambiguous, doubleFlagIgnored } = resolveDice(dieInfos, turn.isDouble);
+
+        if (doubleFlagIgnored) {
+          warnings.push({
+            type: "warn",
+            text: `${gameLabel}, BGA move ${turn.moveNumber != null ? turn.moveNumber : turnIdx + 1} (${turn.player}): a "double" flag from the log did not match ` +
+                  `this move's checker movements (the dice would have to differ), so it was ignored and dice ${dice[0]}${dice[1]} were inferred as a normal roll.`
+          });
+        }
 
         if (ambiguous) {
           warnings.push({
