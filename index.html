@@ -633,7 +633,7 @@ End of game`;
     let lastRoller = null;
     const pendingDouble = Object.create(null);
     const playersSeen = new Set();
-    let winner = null, points = null;
+    let winner = null, points = null, winType = "normal";
     let dateStr = null;
     let currentMoveNumber = null;
     // BGA's log does not contain a line for offering the cube, or for dropping it.
@@ -683,13 +683,20 @@ End of game`;
       if ((m = line.match(/^(.+?)\s+wins?\s+by\s+forfeit\.?\s*(\d+)\s*points?\s*scored\.?$/i))) {
         winner = m[1].trim();
         points = parseInt(m[2], 10);
+        winType = "forfeit";
         freshHeaderPending = false;
         continue;
       }
 
-      if ((m = line.match(/^(.+?)\s+wins?\s+the\s+game\.?\s*(\d+)\s*points?\s*scored\.?$/i))) {
+      // Normal wins, gammons and backgammons are all reported similarly, but
+      // gammon/backgammon lines state only the base multiplier (2 or 3) - not
+      // multiplied by the cube value, unlike a normal win's reported total - so
+      // the caller (which tracks the cube per game) must multiply those by the
+      // final cube value to get the actual points scored.
+      if ((m = line.match(/^(.+?)\s+(?:wins?\s+the\s+game|won\s+a\s+(backgammon|gammon))\.?\s*(\d+)\s*points?\s*scored\.?$/i))) {
         winner = m[1].trim();
-        points = parseInt(m[2], 10);
+        points = parseInt(m[3], 10);
+        winType = m[2] ? m[2].toLowerCase() : "normal";
         if (freshHeaderPending && lastRoller) {
           const dropper = lastRoller;
           const doubler = [...playersSeen].find(p => p !== dropper) || null;
@@ -733,7 +740,7 @@ End of game`;
       freshHeaderPending = false;
     }
 
-    return { turns, winner, points, dateStr };
+    return { turns, winner, points, winType, dateStr };
   }
 
   // ---------------------------------------------------------------------
@@ -1008,8 +1015,13 @@ End of game`;
 
       const scoreBefore0 = score0, scoreBefore1 = score1;
       if (game.winner && game.points) {
-        if (game.winner === col0Player) score0 += game.points;
-        else if (game.winner === col1Player) score1 += game.points;
+        // Gammon/backgammon result lines state only the base multiplier (2 or 3),
+        // not adjusted for the cube, so multiply by the game's final cube value here.
+        const gamePoints = (game.winType === "gammon" || game.winType === "backgammon")
+          ? game.points * cubeValue
+          : game.points;
+        if (game.winner === col0Player) score0 += gamePoints;
+        else if (game.winner === col1Player) score1 += gamePoints;
         else warnings.push({ type: "warn", text: `${gameLabel}: winner "${game.winner}" did not match either player name.` });
       } else {
         warnings.push({ type: "warn", text: `${gameLabel}: no game result ("wins the game") line found; score not updated.` });
