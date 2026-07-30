@@ -1170,7 +1170,11 @@ End of game`;
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const day = String(now.getDate()).padStart(2, '0');
-    const filename = `bga_${year}-${month}-${day}.mat`;
+    //get time in hh-mm-ss format to avoid overwriting previous downloads
+    const time = String(now.getHours()).padStart(2, '0') + '-' + String(now.getMinutes()).padStart(2, '0') + '-' + String(now.getSeconds()).padStart(2, '0');
+    //get match point count to display as 1p, 3p, 5p, etc.
+    const matchLength = Math.max(0, parseInt(matchLengthEl.value, 10) || 0);
+    const filename = `bga_${matchLength}p_${year}-${month}-${day}_${time}.mat`;
     a.download = filename;
     document.body.appendChild(a);
     a.click();
