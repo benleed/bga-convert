@@ -1,0 +1,14 @@
+Move 1 :24/07/2026 11:10:00
+Player1 rolls dice and gets dice and dice
+Move 2 :11:10:05
+Player1 moves 8 ➡ 7 , 13 ➡ 7 .
+Player2 rolls dice and gets dice and dice
+Move 3 :11:10:15
+Player2 moves 13 ➡ 8 , 13 ➡ 11 .
+Player1 rolls dice and gets dice and dice
+Move 122 :11:10:23
+Player1 moves 20 ➡ 17 , 17 ➡ 16 .
+Player2 rolls dice and gets dice and dice
+Move 123 :11:10:33
+Player1 concedes the game.
+End of game

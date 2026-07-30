@@ -687,6 +687,23 @@ End of game`;
         continue;
       }
 
+      if ((m = line.match(/^(.+?)\s+concedes?\s+the\s+game\.?$/i))) {
+        const conceder = m[1].trim();
+        playersSeen.add(conceder);
+        // Determine winner: the other player
+        const otherPlayer = [...playersSeen].find(p => p !== conceder) || null;
+        if (!otherPlayer) {
+          warnings.push({ type: "warn", text: `${gameLabel}: could not identify opponent for concession by "${conceder}"` });
+          freshHeaderPending = false;
+          continue;
+        }
+        winner = otherPlayer;
+        points = 1; // Concession is treated as a 1-point loss
+        winType = "forfeit";
+        freshHeaderPending = false;
+        continue;
+      }
+
       // Normal wins, gammons and backgammons are all reported similarly, but
       // gammon/backgammon lines state only the base multiplier (2 or 3) - not
       // multiplied by the cube value, unlike a normal win's reported total - so
